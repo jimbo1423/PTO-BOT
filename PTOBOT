@@ -1,0 +1,87 @@
+function checkTeamCalendar() {
+  // Check if today is a weekday (Monday to Friday)
+  var today = new Date();
+  var dayOfWeek = today.getDay();
+  
+  if (dayOfWeek === 0 || dayOfWeek === 6) {
+    Logger.log('Script skipped on the weekend.');
+    return;
+  }
+
+  // Set your Google Calendar ID and Slack webhook URL
+  var calendarId = 'c_hvsau0b936dqs9vtfp609qiiro@group.calendar.google.com';
+  var slackWebhookUrl = 'https://hooks.slack.com/workflows/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';
+
+  // Mapping of team members to smart links
+  var teamMembers = {
+    'James': 'https://indeed.lightning.force.com/lightning/r/Report/00ODm0000019vqIMAQ/view?queryScope=userFolders&fv3=James%20Bean',
+    'Lisa': 'https://indeed.lightning.force.com/lightning/r/Report/00ODm0000019vqIMAQ/view?queryScope=userFolders&fv3=Lisa%20Rudolph',
+    'Alejandro': 'https://indeed.lightning.force.com/lightning/r/Report/00ODm0000019vqIMAQ/view?queryScope=userFolders&fv3=Alejandro%20Cruz',
+    'Anna': 'https://indeed.lightning.force.com/lightning/r/Report/00ODm0000019vqIMAQ/view?queryScope=userFolders&fv3=Anna%20Harabosky',
+    'Anthony': 'https://indeed.lightning.force.com/lightning/r/Report/00ODm0000019vqIMAQ/view?queryScope=userFolders&fv3=Anthony%20Benvenuti',
+    'Chelsie': 'https://indeed.lightning.force.com/lightning/r/Report/00ODm0000019vqIMAQ/view?queryScope=userFolders&fv3=Chelsie%20Takaki',
+    'Elizabeth': 'https://indeed.lightning.force.com/lightning/r/Report/00ODm0000019vqIMAQ/view?queryScope=userFolders&fv3=Elizabeth%20Gleason'
+    // Add more team members as needed
+  };
+
+  // Set the time zone for the script
+  var teamTimeZone = 'America/Los_Angeles'; // Adjust to your team's local time zone
+
+  // Get today's date and time in the team's local time zone
+  var teamNow = new Date();
+  teamNow = Utilities.formatDate(teamNow, teamTimeZone, 'yyyy-MM-dd HH:mm:ss');
+
+  // Set the start and end dates for the events
+  var todayStart = new Date(teamNow);
+  todayStart.setHours(0, 0, 0, 0);
+
+  var todayEnd = new Date(todayStart);
+  todayEnd.setHours(0, 1, 0, 0);
+
+  // Fetch events from Google Calendar for today
+  var calendar = CalendarApp.getCalendarById(calendarId);
+  var events = calendar.getEvents(todayStart, todayEnd);
+
+  // Check if there are any events
+  if (events.length > 0) {
+    // Filter events with 'OOO' or 'PTO' in the title
+    var outMembers = events.filter(function (event) {
+      var title = event.getTitle().toUpperCase();
+      return title.includes('OOO') || title.includes('PTO');
+    });
+
+    // Check if there are team members out
+    if (outMembers.length > 0) {
+      // Extract team member names and their smart links
+      var memberInfo = outMembers.map(function (event) {
+        var memberName = event.getTitle().replace(/(OOO|PTO)/i, '').trim();
+        return {
+          name: memberName,
+          link: teamMembers[memberName] || '#', // Use '#' if no smart link is available
+        };
+      });
+
+      // Prepare the message for Slack using a different syntax for links
+      var slackMessage = {
+    text: 'The following team members are out today:\n' +
+      memberInfo.map(function (member) {
+        return `• ${member.name} - Check my cases below ⬇️ ${member.link}`;
+      }).join('\n'),
+  };
+
+      // Send the message to Slack
+      sendSlackMessage(slackWebhookUrl, slackMessage);
+    }
+  }
+}
+
+function sendSlackMessage(webhookUrl, message) {
+  // Send a POST request to the Slack webhook URL
+  var options = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(message),
+  };
+
+  UrlFetchApp.fetch(webhookUrl, options);
+}
